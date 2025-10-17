@@ -1,0 +1,82 @@
+name: flippra
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  video_player: ^2.8.1
+  audioplayers: ^5.2.1
+  http: ^1.2.1
+  get: ^4.7.2
+  shared_preferences: ^2.2.2
+  carousel_slider: ^4.2.1
+  just_audio: ^0.9.36
+  geolocator: ^12.0.0
+  geocoding: ^2.1.0
+  permission_handler: ^11.0.1
+  google_fonts: ^6.1.0
+  flutter_speech: ^2.0.1
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.0
+  animate_do: ^3.3.4
+  flutter_rating_bar: ^4.0.1
+  marquee: ^2.2.3
+  url_launcher: ^6.1.10
+
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/
+    - assets/icons/
+    - assets/videos/
+    - assets/icons/whatsapp.png
+    - assets/icons/man.png
+    - assets/icons/woman.png
+    - assets/icons/hindi.png
+    - assets/icons/home_bg.jpg
+    - assets/icons/volume.png
+    - assets/icons/mute.png
+    - assets/icons/banner_placeholder.png
+    - assets/icons/doctor_placeholder.png
+    - assets/icons/person_icon.png
+    - assets/icons/profile_placeholder.png
+    - assets/icons/custom_bottom_nav_frame.png
+    - assets/icons/map_placeholder.png
+    - assets/icons/business_card_placeholder.png
+    - assets/icons/box.png
+    - assets/icons/toggle.png
+    - assets/images/map_placeholder.png
+    - assets/videos/Login_final.mp4
+    - assets/videos/otp.mp4
+    - assets/videos/world_map.mp4
+    - assets/icons/product.png
+    - assets/icons/service.png
+    - assets/icons/person.png
+    - assets/icons/shopping.png
+    - assets/icons/cart.png
+    - assets/icons/doctor.png
+    - assets/icons/home.png
+    - assets/icons/low.png
+    - assets/icons/parcel.png
+    - assets/icons/setting.png
+    - assets/icons/gallery.png
+    - assets/icons/top_frame.png
+    - assets/icons/english.png
+    - assets/icons/play_button.png
+    - assets/icons/chat.png
+    - assets/icons/call.png
+    - assets/icons/request.png
+    - assets/icons/support.png
