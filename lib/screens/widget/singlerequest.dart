@@ -1,3 +1,5 @@
+import 'dart:math';
+import 'package:flippra/backend/category/getbusinesscards/updatebusinesscard.dart';
 import 'package:flippra/backend/getuser/getuser.dart';
 import 'package:flippra/backend/insertquery/insertquery.dart';
 import 'package:flippra/backend/request_accept/requestservice.dart';
@@ -7,15 +9,21 @@ import 'package:flippra/screens/widget/singlerequestscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:get/get.dart';
+import 'package:get/get_connect/http/src/request/request.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../backend/category/getbusinesscards/getbusinesscard.dart';
 import '../../backend/getnearvendor/getnearvendor.dart';
 import '../../backend/home/getcategory/getchildcategory.dart';
 import 'package:flutter/services.dart';
 import '../../utils/shared_prefs_helper.dart';
+import '../../backend/category/getbusinesscards/getbusinesscard.dart';
+import '../../core/constant.dart';
+import 'cancelrow.dart';
+
 
 class SingleRequest extends StatefulWidget {
   final String id;
@@ -43,7 +51,7 @@ class _SingleRequestState extends State<SingleRequest> {
   int _selectedIndex = 0;
   int _selectedServiceIndex = 0;
   bool _isToggleRight = false;
-  late Future<List<GetBusinessCardModel>> _businesscard;
+  // late Future<List<GetBusinessCardModel>> _businesscard;
   List<CategoryModel> _childcategory = [];
   bool _isLoading = true;
   final GlobalKey<FloatingRequestCardState> _floatingCardKey =
@@ -55,12 +63,32 @@ class _SingleRequestState extends State<SingleRequest> {
   final requestService = Get.put(RequestService());
   final insertquery = Get.put(InsertQuery());
   final getNearVendor = Get.put(GetNearVendor());
+  final updatebusinesscard = Get.put(UpdateBusinessCard());
   double minRange = 10.0;
   double maxRange = 50.0;
   String currentRadius = "10";
   String currentWork = "Milkman";
   String currentType = "Cowmilk";
   String currentVendorType = "Wholeseller";
+  String? _rid;
+  String? Rid;
+  final _business = Get.put(GetBusinessCardController());
+
+  String getRid() {
+    if (_rid == null) {
+      final random = Random();
+      _rid = (10 + random.nextInt(90)).toString(); // generates 10-99
+      debugPrint("Generated new RID: $_rid");
+    }
+    return _rid!;
+  }
+
+  void regenerateRid() {
+    final random = Random();
+    _rid = (10 + random.nextInt(90)).toString();
+    debugPrint("RID regenerated: $_rid");
+  }
+
 
   @override
   void initState() {
@@ -72,7 +100,7 @@ class _SingleRequestState extends State<SingleRequest> {
 
     // default filter at start
     _selectedFilter = "All";
-    _businesscard = GetBusinessCard.getbusinesscard('4', _selectedFilter!);
+    // _businesscard = GetBusinessCard.getbusinesscard('4', _selectedFilter!);
 
     minRange = 10.0;
     maxRange = 50.0;
@@ -380,11 +408,15 @@ class _SingleRequestState extends State<SingleRequest> {
 
   Future<void> _handleRequest(BuildContext context, GetBusinessCardModel card) async {
     debugPrint("🚀 _handleRequest started");
-
+    _rid = getRid();
+    debugPrint(_rid);
+    Rid = _rid;
     try {
 
       await _loadUser();
       debugPrint("🟢 _loadUser completed");
+      final rid = getRid();
+      print("Using RID: $rid");
 
       if (getusercontroller.users.isEmpty) {
         debugPrint('⚠️ No user data found, cannot send request');
@@ -395,10 +427,8 @@ class _SingleRequestState extends State<SingleRequest> {
         return;
       }
 
-      // Step 2: Extract user info
       final user = getusercontroller.users.first;
 
-      // Step 3: Call the request service
       debugPrint("📡 Sending request...");
       final success = await requestService.registerService(
         token: 'wvnwivnoweifnqinqfinefnq',
@@ -407,10 +437,16 @@ class _SingleRequestState extends State<SingleRequest> {
         email: user.email,
         phoneNumber: user.phoneNumber,
         images: '',
-        service: card.Service,
+        service: card.service,
         cardid: card.id.toString(),
+        rid: rid.toString()
       );
       debugPrint("✅ Request completed with success flag: $success");
+      await UpdateBusinessCard.updateBusinessCard(
+        id: card.id.toString(),
+        request: "Yes",
+      );
+
       debugPrint("💬 Message: ${requestService.message.value}");
 
       if (!context.mounted) return;
@@ -426,7 +462,7 @@ class _SingleRequestState extends State<SingleRequest> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SingleRequestScreen(card: card),
+            builder: (context) => SingleRequestScreen(card: card,Rid: _rid.toString()),
           ),
         );
         debugPrint("🟢 Navigation to SingleRequestScreen done");
@@ -769,7 +805,7 @@ class _SingleRequestState extends State<SingleRequest> {
                 if (result != null) {
                   setState(() {
                     _selectedFilter = result; // ✅ save user’s choice
-                    _businesscard = GetBusinessCard.getbusinesscard('4', _selectedFilter!);
+                    // _businesscard = GetBusinessCard.getbusinesscard('4', _selectedFilter!);
                   });
                 }
               },
@@ -881,153 +917,328 @@ class _SingleRequestState extends State<SingleRequest> {
     }).whereType<Marker>().toList();
   }
 
-  Widget _buildBusinessCardList() {
-    return Expanded(
-      child: FutureBuilder<List<GetBusinessCardModel>>(
-        future: _businesscard,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No business cards available'));
-          }
-
-          final cards = snapshot.data!;
-          return Container(
-            color: const Color(0xFF00B3A7),
-            margin: const EdgeInsets.only(bottom: 100),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(10.0),
-              itemCount: cards.length,
-              itemBuilder: (context, index) => _buildBusinessCard(context, cards[index]),
+  Widget emptyVendorProgress() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(6.0),
+        child: Column(
+          children: List.generate(
+            3,
+                (_) => Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      spreadRadius: 4,
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 25,bottom: 25,left: 20,right: 20),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 5),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 60,
+                            child: Column(
+                              children: [
+                                _shimmerBox(
+                                  height: 60,
+                                  width: 100,
+                                  borderRadius: 70,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 30),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _shimmerBox(height: 16, width: 80),
+                                const SizedBox(height: 6),
+                                _shimmerBox(height: 18, width: 140),
+                                const SizedBox(height: 6),
+                                _shimmerBox(height: 12, width: 100),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildBusinessCard(BuildContext context, GetBusinessCardModel card)  {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(10.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
+  Widget _shimmerBox({
+    required double height,
+    double? width,
+    double borderRadius = 4,
+  }) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        height: height,
+        width: width ?? double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
       ),
-      child: Stack(
-        children: [
-          Column(
+    );
+  }
+
+  Widget _buildBusinessCardList() {
+    return Expanded(
+      child: Obx(() {
+        final showShimmer = !_business.hasInitialData.value && _business.cards.isEmpty;
+
+        return StreamBuilder<List<GetBusinessCardModel>>(
+          stream: _business.getBusinessCardStream(
+            subcategoryId: widget.id,
+            vendorType: _selectedFilter ?? "All",
+          ),
+          builder: (context, snapshot) {
+            // First load → shimmer
+            if (showShimmer) {
+              return emptyVendorProgress();
+            }
+
+            // Empty state
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(
+                child: Text(
+                  'No business cards available',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              );
+            }
+
+            // Real cards
+            return Container(
+              color: const Color(0xFF00B3A7),
+              padding: const EdgeInsets.only(bottom: 100),
+              child: ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, i) => _buildBusinessCard(context, snapshot.data![i]),
+              ),
+            );
+          },
+        );
+      }),
+    );
+  }
+
+  Widget _buildBusinessCard(BuildContext context, GetBusinessCardModel card) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Card(
+        elevation: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: const LinearGradient(
+              colors: [Colors.white, Color(0xFFF5FFFE)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Stack(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(10),
-                      image: DecorationImage(
-                        fit: BoxFit.cover,
-                        image: (card.fullImageUrl.isNotEmpty)
-                            ? NetworkImage(card.fullImageUrl)
-                            : const AssetImage(
-                          'assets/icons/business_card_placeholder.png',
-                        ) as ImageProvider,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  children: [
+                    // Image + Info
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          card.productName,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text(
-                              '₹ ${card.price}',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.normal),
+                        // Image
+                        Hero(
+                          tag: 'card_${card.id}',
+                          child: Container(
+                            width: 88,
+                            height: 88,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: Colors.teal.shade100, width: 2.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 10),
-                            _buildRatingStars(double.tryParse(card.rating) ?? 0),
-                          ],
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: Image.network(
+                                card.fullImageUrl.isNotEmpty
+                                    ? card.fullImageUrl
+                                    : 'https://via.placeholder.com/88',
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Image.asset(
+                                  'assets/icons/business_card_placeholder.png',
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 16),
+
+                        const SizedBox(width: 16),
+
+                        // Info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                card.productName,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Text(
+                                    '₹ ${card.price}',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.teal,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildRatingStars(double.tryParse(card.rating) ?? 0),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 20),
+
+                    // Action Buttons
+                    card.request != "Yes"
+                        ? DualSliderButton(
+                      onEnquiry: () => _handleQuery(context),
+                      onRequest: () => _handleRequest(context, card),
+                    )
+                        : _buildRequestSentRow(context, card),
+                  ],
+                ),
               ),
-              DualSliderButton(
-                onEnquiry: () {
-                  _handleQuery(context);
-                },
-                onRequest: () {
-                  _handleRequest(context, card);
-                },
+
+              // Cart Badge
+              Positioned(
+                top: 14,
+                right: 14,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade600,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.add_shopping_cart, size: 18, color: Colors.white),
+                ),
               ),
             ],
           ),
-          Positioned(
-            top: 1,
-            right: 1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRequestSentRow(BuildContext context, GetBusinessCardModel card) {
+    return Row(
+      children: [
+        // Request Sent
+        Expanded(
+          flex: 3,
+          child: GestureDetector(
+            onTap: () {
+              if (!context.mounted) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SingleRequestScreen(card: card, Rid: Rid.toString()),
+                ),
+              );
+            },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.teal,
-                borderRadius: BorderRadius.circular(20),
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.green.shade300),
               ),
-              child: Row(
-                children: [
-                  // GestureDetector(
-                  //   onTap: _decrease,
-                  //   child: const Icon(Icons.remove, size: 18, color: Colors.white),
-                  // ),
-                  const SizedBox(width: 6),
-                  Icon(Icons.add_shopping_cart,size: 18,color: Colors.white,),
-                  const SizedBox(width: 6),
-                  // GestureDetector(
-                  //   onTap: _increase,
-                  //   child: const Icon(Icons.add, size: 18, color: Colors.white),
-                  // ),
-                ],
+              child: const Text(
+                "Request Sent",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+
+        const SizedBox(width: 12),
+
+        // Cancel Button with Spinner
+        Expanded(
+          flex: 1,
+          child: CancelButton(card: card),
+        ),
+      ],
     );
   }
 
   Widget _buildRatingStars(double rating) {
-    final fullStars = rating.floor();
-    final hasHalfStar = (rating - fullStars) >= 0.5;
-
     return Row(
-      children: List.generate(5, (index) {
-        if (index < fullStars) {
-          return const Icon(Icons.star, color: Colors.amber, size: 20);
-        } else if (index == fullStars && hasHalfStar) {
-          return const Icon(Icons.star_half, color: Colors.amber, size: 20);
-        } else {
-          return const Icon(Icons.star_border, color: Colors.amber, size: 20);
-        }
+      children: List.generate(5, (i) {
+        return Icon(
+          i < rating ? Icons.star : Icons.star_border,
+          size: 16,
+          color: Colors.orange.shade600,
+        );
       }),
     );
   }
@@ -1045,6 +1256,62 @@ class _SingleRequestState extends State<SingleRequest> {
             borderRadius: BorderRadius.circular(20),
           ),
           child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+        ),
+      ),
+    );
+  }
+
+  Widget emptyshortcircullar() {
+    final double iconSize = 32;
+    final double labelHeight = 5;
+    final double spacing = 6;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: List.generate(
+          5, // Show 5 placeholders (adjust as needed)
+              (_) => Padding(
+            padding: const EdgeInsets.only(right: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Circular Icon Placeholder
+                _shimmershortBox(
+                  height: iconSize,
+                  width: iconSize,
+                  borderRadius: iconSize / 2,
+                ),
+                SizedBox(height: spacing),
+                // Label Placeholder
+                _shimmershortBox(
+                  height: labelHeight,
+                  width: 50,
+                  borderRadius: 6,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _shimmershortBox({
+    required double height,
+    required double width,
+    required double borderRadius,
+  }) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        height: height,
+        width: width,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(borderRadius),
         ),
       ),
     );
@@ -1087,7 +1354,7 @@ class _SingleRequestState extends State<SingleRequest> {
                   children: [
                     Expanded(
                       child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
+                          ? emptyshortcircullar()
                           : SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -1103,10 +1370,10 @@ class _SingleRequestState extends State<SingleRequest> {
                                         .indexWhere((element) => element.id == item.id) +
                                         1,
                                     onTap: () {
-                                      setState(() {
-                                        _businesscard =
-                                            GetBusinessCard.getbusinesscard(item.id.toString(),"All" );
-                                      });
+                                      // setState(() {
+                                      //   _businesscard =
+                                      //       _business(item.id.toString(),"All" );
+                                      // });
                                     },
                                   ),
                                 ),
@@ -1121,11 +1388,11 @@ class _SingleRequestState extends State<SingleRequest> {
                 ),
               ),
             ),
-            Bottomnavbar(
-              onProfileTap: () => debugPrint('Profile tapped'),
-              onToggle: () => debugPrint('Toggle switched'),
-              onBoxTap: () => debugPrint('Box tapped'),
-            ),
+            // Bottomnavbar(
+            //   onProfileTap: () => debugPrint('Profile tapped'),
+            //   onToggle: () => debugPrint('Toggle switched'),
+            //   onBoxTap: () => debugPrint('Box tapped'),
+            // ),
           ],
         ),
       ),
@@ -1149,77 +1416,80 @@ class _SingleRequestState extends State<SingleRequest> {
     return Semantics(
       label: label,
       button: true,
-      child: InkWell(
-        key: key,
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: isTablet ? 56 : 40,
-              height: isTablet ? 56 : 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: borderColor,
-                  width: _selectedIndex == index ? 2 : 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 15,right: 15),
+        child: InkWell(
+          key: key,
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: isTablet ? 56 : 40,
+                height: isTablet ? 56 : 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: borderColor,
+                    width: _selectedIndex == index ? 2 : 1,
                   ),
-                ],
-              ),
-              child: Center(
-                child: isNetworkImage
-                    ? ClipOval(
-                  child: Image.network(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: isNetworkImage
+                      ? ClipOval(
+                    child: Image.network(
+                      iconPath,
+                      fit: BoxFit.cover,
+                      width: isTablet ? 48 : 42,
+                      height: isTablet ? 48 : 42,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.broken_image,
+                          size: 28,
+                          color: Color(0xFF1E88E5),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                      : Image.asset(
                     iconPath,
                     fit: BoxFit.cover,
                     width: isTablet ? 48 : 42,
                     height: isTablet ? 48 : 42,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(
-                        Icons.broken_image,
-                        size: 28,
-                        color: Color(0xFF1E88E5),
-                      );
-                    },
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return const SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      );
-                    },
                   ),
-                )
-                    : Image.asset(
-                  iconPath,
-                  fit: BoxFit.cover,
-                  width: isTablet ? 48 : 42,
-                  height: isTablet ? 48 : 42,
                 ),
               ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: isTablet ? 12 : screenWidth * 0.028,
-                fontWeight: FontWeight.w500,
-                color: _selectedIndex == index
-                    ? const Color(0xFF1E88E5)
-                    : Colors.grey.shade800,
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: isTablet ? 12 : screenWidth * 0.028,
+                  fontWeight: FontWeight.w500,
+                  color: _selectedIndex == index
+                      ? const Color(0xFF1E88E5)
+                      : Colors.grey.shade800,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1354,8 +1624,8 @@ class _DualSliderButtonState extends State<DualSliderButton>
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width * 0.8;
-    const height = 40.0;
-    const circleSize = 35.0;
+    const height = 35.0;
+    const circleSize = 30.0;
     final centerPosition = (width - circleSize) / 2;
     final minLimit = width * 0.02;
     final maxLimit = width * 0.98 - circleSize;
@@ -1561,7 +1831,7 @@ class _DualSliderButtonState extends State<DualSliderButton>
                         child: Icon(
                           _isDoneIcon ? Icons.done : Icons.arrow_forward_ios,
                           key: ValueKey<bool>(_isDoneIcon),
-                          size: 15,
+                          size: 12,
                           color: Colors.black87,
                         ),
                       ),

@@ -15,6 +15,7 @@ class RequestService extends GetxController {
     required String images,
     required String service,
     required String cardid,
+    required String rid,
   }) async {
     final url = Uri.parse(
       'https://flippraa.anklegaming.live/APIs/APIs.asmx/AddRequestAssignVendor',
@@ -34,7 +35,8 @@ class RequestService extends GetxController {
           'PhoneNumber': phoneNumber,
           'Images': images,
           'Service': service,
-          'Cardid': cardid
+          'Cardid': cardid,
+          'Rid':rid
         },
       );
 

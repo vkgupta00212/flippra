@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flippra/backend/category/getacceptvendor/getacceptvendor.dart';
+import 'package:flippra/core/constant.dart';
 import 'package:flippra/screens/widget/chatscreen2.dart';
 import 'package:flippra/screens/widget/requestcard.dart';
 import 'package:flutter/material.dart';
@@ -13,11 +14,13 @@ import '../../backend/category/getbusinesscards/getbusinesscard.dart';
 import '../../backend/home/getcategory/getchildcategory.dart';
 import 'package:flutter/services.dart';
 import '../../backend/order/showacceptvendor.dart';
+import 'package:shimmer/shimmer.dart';
 
 
 class SingleRequestScreen extends StatefulWidget {
   final GetBusinessCardModel card;
-  const SingleRequestScreen({Key? key, required this.card}) : super(key: key);
+  final String Rid;
+  const SingleRequestScreen({Key? key, required this.card,required this.Rid}) : super(key: key);
 
   @override
   State<SingleRequestScreen> createState() => _SingleRequestScreenState();
@@ -45,8 +48,8 @@ class _SingleRequestScreenState extends State<SingleRequestScreen> {
   void initState() {
     super.initState();
     _getCurrentLocation();
-    showacceptvendor.fetchAcceptedVendors();
-    showacceptvendor.startAutoRefresh(intervalSeconds:1);
+    showacceptvendor.fetchAcceptedVendors(widget.Rid);
+    showacceptvendor.startAutoRefresh(requestId: widget.Rid,intervalSeconds:1);
   }
 
 
@@ -273,13 +276,103 @@ class _SingleRequestScreenState extends State<SingleRequestScreen> {
     );
   }
 
+  Widget emptyVendorProgress() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(6.0),
+        child: Column(
+          children: List.generate(
+            3,
+                (_) => Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00B3A7),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      spreadRadius: 4,
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 25,bottom: 25,left: 20,right: 20),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 5),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 60,
+                            child: Column(
+                              children: [
+                                _shimmerBox(
+                                  height: 60,
+                                  width: 100,
+                                  borderRadius: 70,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 30),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _shimmerBox(height: 16, width: 80),
+                                const SizedBox(height: 6),
+                                _shimmerBox(height: 18, width: 140),
+                                const SizedBox(height: 6),
+                                _shimmerBox(height: 12, width: 100),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _shimmerBox({
+    required double height,
+    double? width,
+    double borderRadius = 4,
+  }) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        height: height,
+        width: width ?? double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+      ),
+    );
+  }
+
   Widget _buildRequestVendor(BuildContext context) {
     return StreamBuilder<List<AcceptVendorModel>>(
       stream: showacceptvendor.vendorStream, // from controller
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
+        // if (snapshot.connectionState == ConnectionState.waiting) {
+        //   return const Center(child: CircularProgressIndicator());
+        // } else
+         if (snapshot.hasError) {
           return Center(
             child: Text(
               "Error: ${snapshot.error}",
@@ -287,7 +380,7 @@ class _SingleRequestScreenState extends State<SingleRequestScreen> {
             ),
           );
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text("No vendors found"));
+          return emptyVendorProgress();
         }
 
         final vendors = snapshot.data!;
@@ -696,84 +789,107 @@ class ServiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(5),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.green, width: 1.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.green.shade600, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.green.withOpacity(0.12),
             spreadRadius: 1,
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Service Image/Icon
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child:   ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+          // Service Image (Circular with border)
+          Container(
+            height: 74,
+            width: 74,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.green.shade200, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
               child: Image.network(
                 imageAsset,
-                height: 70,
-                width: 70,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.broken_image,
-                  size: 40,
-                  color: Colors.grey,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey[200],
+                  child: Icon(
+                    Icons.broken_image,
+                    color: Colors.grey[400],
+                    size: 32,
+                  ),
                 ),
-              )
+              ),
             ),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: 16),
+          // Content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Order ID
-                const SizedBox(height: 1),
+                // Title
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 1),
+
+                const SizedBox(height: 4),
+
+                // Subtitle
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: Colors.grey[700],
+                    height: 1.3,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 1),
-                ElevatedButton(
-                  onPressed: onPressed,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+
+                const SizedBox(height: 10),
+
+                // Action Button
+                SizedBox(
+                  height: 32,
+                  child: ElevatedButton(
+                    onPressed: onPressed,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange.shade600,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      textStyle: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 26,
-                      vertical: 5,
-                    ),
-                  ),
-                  child: Text(
-                    buttonText,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    child: Text(buttonText),
                   ),
                 ),
               ],
