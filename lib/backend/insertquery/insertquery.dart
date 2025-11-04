@@ -15,9 +15,12 @@ class InsertQuery extends GetxController {
     required String Address,
   }) async {
     final url = Uri.parse(
-        'https://flippraa.anklegaming.live/APIs/APIs.asmx/InsertQuery');
+      'https://flippraa.anklegaming.live/APIs/APIs.asmx/InsertQuery',
+    );
+
     try {
       isLoading.value = true;
+      print("🚀 [InsertQuery] Sending data to server...");
 
       final response = await http.post(
         url,
@@ -36,33 +39,37 @@ class InsertQuery extends GetxController {
 
       isLoading.value = false;
 
-      if (response.statusCode == 200) {
-        print("✅ Query Sent");
-        print(response.body);
+      print("📩 [InsertQuery] Status Code: ${response.statusCode}");
+      print("📦 [InsertQuery] Response Body: ${response.body}");
 
+      if (response.statusCode == 200) {
         try {
           final Map<String, dynamic> data = jsonDecode(response.body);
 
-          if (data['Message'] == "inserted") {
-            message.value = "Rating inserted successfully";
+          // ✅ match exact "Inserted" (case-sensitive)
+          if (data['Message']?.toString().toLowerCase() == "inserted") {
+            message.value = "Query inserted successfully!";
+            print("✅ [InsertQuery] Success: ${message.value}");
             return true;
           } else {
             message.value = data['Message'] ?? "Unknown response";
+            print("⚠️ [InsertQuery] Response Message: ${message.value}");
             return false;
           }
         } catch (e) {
-          print("⚠️ Could not parse response: $e");
+          print("⚠️ [InsertQuery] JSON parse error: $e");
           message.value = "Invalid response format";
           return false;
         }
       } else {
-        print("❌ Failed with status: ${response.statusCode}");
+        print("❌ [InsertQuery] HTTP Error: ${response.statusCode}");
         message.value = "Failed: ${response.statusCode}";
         return false;
       }
-    } catch (e) {
+    } catch (e, stack) {
       isLoading.value = false;
-      print("❌ Exception while inserting rating: $e");
+      print("🔥 [InsertQuery] Exception: $e");
+      print(stack);
       message.value = "Exception: $e";
       return false;
     }

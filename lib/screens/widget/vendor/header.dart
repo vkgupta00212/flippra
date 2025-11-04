@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 
 class VendorHeader extends StatelessWidget {
-  const VendorHeader({super.key});
+  final String pending;
+  const VendorHeader({super.key,required this.pending});
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +59,7 @@ class VendorHeader extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: const [
                           Text(
-                            '7456',
+                            '0',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 11,
@@ -77,47 +78,47 @@ class VendorHeader extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                GestureDetector(
-                  onTap: () {},
-                  child: FadeInLeft(
-                    duration: const Duration(milliseconds: 400),
-                    child: Container(
-                      width: isTablet ? 200 : screenWidth * 0.3, // Responsive width
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF00B3A7), Color(0xFF006D5B)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(30),
-                          bottomLeft: Radius.circular(30),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 8,
-                            offset: const Offset(2, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Text(
-                            'Enquiry',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w200,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                // GestureDetector(
+                //   onTap: () {},
+                //   child: FadeInLeft(
+                //     duration: const Duration(milliseconds: 400),
+                //     child: Container(
+                //       width: isTablet ? 200 : screenWidth * 0.3, // Responsive width
+                //       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                //       decoration: BoxDecoration(
+                //         gradient: const LinearGradient(
+                //           colors: [Color(0xFF00B3A7), Color(0xFF006D5B)],
+                //           begin: Alignment.topCenter,
+                //           end: Alignment.bottomCenter,
+                //         ),
+                //         borderRadius: const BorderRadius.only(
+                //           topLeft: Radius.circular(30),
+                //           bottomLeft: Radius.circular(30),
+                //         ),
+                //         boxShadow: [
+                //           BoxShadow(
+                //             color: Colors.black.withOpacity(0.2),
+                //             blurRadius: 8,
+                //             offset: const Offset(2, 2),
+                //           ),
+                //         ],
+                //       ),
+                //       child: Row(
+                //         mainAxisAlignment: MainAxisAlignment.center,
+                //         children: const [
+                //           Text(
+                //             'Enquiry',
+                //             style: TextStyle(
+                //               color: Colors.white,
+                //               fontSize: 11,
+                //               fontWeight: FontWeight.w200,
+                //             ),
+                //           ),
+                //         ],
+                //       ),
+                //     ),
+                //   ),
+                // ),
               ],
             ),
             const SizedBox(height: 8),
@@ -155,7 +156,7 @@ class VendorHeader extends StatelessWidget {
                   duration: const Duration(milliseconds: 900),
                   child: InfoCard(
                     icon: Icons.pending_actions_sharp,
-                    value: "7556",
+                    value: pending,
                     label: "Pending\nOrders",
                     width: cardWidth,
                   ),

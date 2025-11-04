@@ -17,7 +17,6 @@ import 'package:flippra/screens/shop2_screen.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 👇 Configure system status bar before app runs
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,       // transparent so background shows
@@ -45,7 +44,7 @@ class MyApp extends StatelessWidget {
         '/sign_up': (context) => const SignUpScreen(),
         '/home': (context) => const HomeScreen(),
         '/shop2_screen': (context) => const Shop2Screen(),
-        '/homecategory': (context) => const HomeScreenCategoryScreen(),
+        '/homecategory': (context) => HomeScreenCategoryScreen(),
         '/homemain': (context) => const HomeMain(),
         '/order': (context) => const OrderDetailsBottomSheet2(),
       },

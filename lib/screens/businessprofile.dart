@@ -1,3 +1,4 @@
+import 'dart:ffi';
 import 'dart:ui';
 import 'package:flippra/screens/widget/businessprofile/businesscard.dart';
 import 'package:flippra/screens/widget/businessprofile/footer.dart';
@@ -12,6 +13,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flippra/core/constant.dart';
 
+import '../utils/shared_prefs_helper.dart';
+import 'get_otp_screen.dart';
+
 class BusinessScreen extends StatefulWidget {
   const BusinessScreen({super.key});
 
@@ -23,6 +27,74 @@ class _BusinessScreenState extends State<BusinessScreen> {
   int selectedIndex = 0;
   int footerIndex = 0;
 
+// ──────────────────────────────────────────────────────────────────────
+//  Inside _BusinessScreenState (replace the old logoutUser function)
+// ──────────────────────────────────────────────────────────────────────
+  Future<void> _showLogoutConfirmation(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // user must tap a button
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Logout',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              fontSize: 18,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to logout?',
+            style: GoogleFonts.poppins(fontSize: 15),
+          ),
+          actions: [
+            // ── Cancel ──
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            // ── OK ──
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.pillButtonGradientStart,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                'OK',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    // If user pressed OK
+    if (confirmed == true) {
+      await SharedPrefsHelper.clearUserData();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const GetOtpScreen()),
+            (Route<dynamic> route) => false,
+      );
+    }
+  }
+
   final Map<String, dynamic> userData = {
     "firstName": "Vishal",
     "lastName": "Gupta",
@@ -33,20 +105,10 @@ class _BusinessScreenState extends State<BusinessScreen> {
   };
   List<List<Map<String, dynamic>>> get tabData => [
     [
-      {"icon": Icons.wallet, "title": "E-Wallet | Details", "screen": null},
+      {"icon": Icons.wallet, "title": "Balance", "screen": null},
       {
         "icon": Icons.history,
-        "title": "History | Details",
-        "screen": null
-      },
-      {
-        "icon": Icons.history_toggle_off,
-        "title": "Wallet | Details",
-        "screen": null
-      },
-      {
-        "icon": Icons.add_business,
-        "title": "Business | Details",
+        "title": "Transaction History",
         "screen": null
       },
     ],
@@ -101,7 +163,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
       {
         "icon": Icons.logout_rounded,
         "title": "Account | Logout",
-        "screen": null
+        "onTap": null,
       },
     ],
     [
@@ -128,7 +190,16 @@ class _BusinessScreenState extends State<BusinessScreen> {
         "title": "Privacy & policy",
         "screen": null
       },
-      {"icon": Icons.note_add, "title": "Document", "screen": null},
+      {
+        "icon": Icons.sticky_note_2_sharp,
+        "title": "Terms & condition",
+        "screen": null
+      },
+      {
+        "icon": Icons.sticky_note_2_sharp,
+        "title": "About us",
+        "screen": null
+      },
     ],
     [
       {
@@ -211,22 +282,30 @@ class _BusinessScreenState extends State<BusinessScreen> {
                         padding:
                         EdgeInsets.only(bottom: screenHeight * 0.015),
                         child: GestureDetector(
-                          onTap: () {
-                            if (entry['screen'] != null) {
+                          onTap: () async {
+                            final onTap = entry['onTap'];
+                            final screen = entry['screen'] as Widget?;
+
+                            // ✅ Handle Logout manually
+                            if (entry['title'] == "Account | Logout") {
+                              await _showLogoutConfirmation(context);
+                              return;
+                            }
+
+                            if (onTap != null && onTap is Function(BuildContext)) {
+                              onTap(context);
+                            } else if (screen != null) {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                  entry['screen'] as Widget,
-                                ),
+                                MaterialPageRoute(builder: (context) => screen),
                               );
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text('${entry["title"]} tapped')),
+                                SnackBar(content: Text('${entry["title"]} tapped')),
                               );
                             }
                           },
+
                           child: BusinessCard(
                             icon: entry['icon'] as IconData,
                             title: entry['title'] as String,

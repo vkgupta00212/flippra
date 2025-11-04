@@ -4,23 +4,13 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 class GetBusinessCardController extends GetxController {
-  // ──────────────────────────────────────────────────────
-  // 1. Public reactive list – widgets bind to this
-  // ──────────────────────────────────────────────────────
   final cards = <GetBusinessCardModel>[].obs;
   final message = ''.obs;
-
-  // ──────────────────────────────────────────────────────
-  // 2. NEW: flag that tells us if we already received the first batch
-  // ──────────────────────────────────────────────────────
   final hasInitialData = false.obs;
 
-  // ──────────────────────────────────────────────────────
-  // 3. Private fetch flag – prevents parallel calls
-  // ──────────────────────────────────────────────────────
   bool _isFetching = false;
-
-  StreamController<List<GetBusinessCardModel>>? _streamController;
+  Timer? _autoRefreshTimer;
+  late final StreamController<List<GetBusinessCardModel>> _streamController;
 
   @override
   void onInit() {
@@ -30,53 +20,51 @@ class GetBusinessCardController extends GetxController {
 
   @override
   void onClose() {
-    _streamController?.close();
+    _autoRefreshTimer?.cancel();
+    _streamController.close();
     super.onClose();
   }
 
-  /// ----------------------------------------------------
-  /// Stream that auto-refreshes every 5 seconds
-  /// ----------------------------------------------------
+  /// 🔁 Get the stream (starts fetching automatically)
   Stream<List<GetBusinessCardModel>> getBusinessCardStream({
     required String subcategoryId,
     required String vendorType,
   }) {
-    Timer.periodic(const Duration(seconds: 5), (timer) async {
-      if (_streamController!.isClosed) {
-        timer.cancel();
-        return;
-      }
-
-      await _fetchBusinessCards(
-        subcategoryId: subcategoryId,
-        vendorType: vendorType,
-      );
-
-      // Push the current list to the stream
-      _streamController!.add(cards.toList());
-
-      // Mark the first successful fetch
-      if (!hasInitialData.value && cards.isNotEmpty) {
-        hasInitialData.value = true;
-      }
-    });
-
-    return _streamController!.stream;
+    _startAutoRefresh(subcategoryId: subcategoryId, vendorType: vendorType);
+    return _streamController.stream;
   }
 
-  /// ----------------------------------------------------
-  /// Private fetch – no public loading observable
-  /// ----------------------------------------------------
+  /// 🔄 Start automatic refresh every few seconds
+  void _startAutoRefresh({
+    required String subcategoryId,
+    required String vendorType,
+    int intervalSeconds = 5, // change to whatever interval you want
+  }) {
+    _autoRefreshTimer?.cancel(); // cancel previous timer if running
+    _fetchBusinessCards(subcategoryId: subcategoryId, vendorType: vendorType);
+
+    _autoRefreshTimer = Timer.periodic(
+      Duration(seconds: intervalSeconds),
+          (_) => _fetchBusinessCards(
+        subcategoryId: subcategoryId,
+        vendorType: vendorType,
+      ),
+    );
+  }
+
+  /// 📡 Fetch business cards from API
   Future<void> _fetchBusinessCards({
     required String subcategoryId,
     required String vendorType,
   }) async {
-    if (_isFetching) return;          // avoid duplicate calls
+    if (_isFetching) return;
     _isFetching = true;
 
     final url = Uri.parse(
       "https://flippraa.anklegaming.live/APIs/APIs.asmx/ShowBussinessCards",
     );
+
+    print("📡 [GetBusinessCard] Fetching: SubCategory=$subcategoryId, VendorType=$vendorType");
 
     try {
       final response = await http.post(
@@ -89,36 +77,54 @@ class GetBusinessCardController extends GetxController {
         },
       );
 
-      print("Status code : ${response.statusCode}");
-      print("Raw response : ${response.body}");
-
       if (response.statusCode == 200) {
         dynamic decoded = jsonDecode(response.body);
         if (decoded is String) decoded = jsonDecode(decoded);
 
-        final List<dynamic> jsonData = decoded;
-        cards.value = jsonData
-            .map((item) => GetBusinessCardModel.fromJson(item))
-            .toList();
+        if (decoded is List) {
+          final fetchedCards = decoded
+              .map((item) => GetBusinessCardModel.fromJson(item))
+              .toList();
 
-        message.value = "Fetched successfully";
-        print("Parsed ${cards.length} business cards");
+          cards.value = fetchedCards;
+          message.value = "Success";
+
+          if (!_streamController.isClosed) {
+            _streamController.add(fetchedCards);
+          }
+
+          hasInitialData.value = true;
+          print("✅ Loaded ${fetchedCards.length} cards");
+        } else {
+          _handleError("Unexpected JSON format: $decoded");
+        }
       } else {
-        message.value = "Failed with status ${response.statusCode}";
-        print("Failed to fetch cards: ${response.statusCode}");
+        _handleError("Failed: ${response.statusCode}");
       }
     } catch (e) {
-      message.value = "Error: $e";
-      print("Exception while fetching business cards: $e");
+      _handleError("Error: $e");
     } finally {
       _isFetching = false;
     }
   }
+
+  void _handleError(String msg) {
+    message.value = msg;
+    cards.clear();
+    if (!_streamController.isClosed) _streamController.add([]);
+    print("⚠️ $msg");
+  }
+
+  /// 🔄 Manual refresh
+  Future<void> refreshCards({
+    required String subcategoryId,
+    required String vendorType,
+  }) async {
+    await _fetchBusinessCards(subcategoryId: subcategoryId, vendorType: vendorType);
+  }
 }
 
-/// ──────────────────────────────────────────────────────
-/// Model – unchanged (fullImageUrl getter already there)
-/// ──────────────────────────────────────────────────────
+/// 🧾 Model
 class GetBusinessCardModel {
   final int id;
   final String productName;
@@ -144,18 +150,17 @@ class GetBusinessCardModel {
 
   factory GetBusinessCardModel.fromJson(Map<String, dynamic> json) {
     return GetBusinessCardModel(
-      id: json['id'] ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       productName: json['ProductName'] ?? '',
-      price: json['Price'] ?? '',
-      rating: json['Rating'] ?? '',
+      price: json['Price']?.toString() ?? '',
+      rating: json['Rating']?.toString() ?? '',
       img: json['Images'] ?? '',
-      childCat: json['ChildCategory'] ?? '',
+      childCat: json['ChildCategory']?.toString() ?? '',
       service: json['Service'] ?? '',
       vendorType: json['VendorType'] ?? '',
       request: json['Request'] ?? '',
     );
   }
 
-  String get fullImageUrl =>
-      "https://flippraa.anklegaming.live/image/$img";
+  String get fullImageUrl => "https://flippraa.anklegaming.live/image/$img";
 }

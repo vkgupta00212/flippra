@@ -49,9 +49,9 @@ class _BusinessHeaderState extends State<BusinessHeader> {
 
       return GestureDetector(
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Business Header tapped')),
-          );
+          // ScaffoldMessenger.of(context).showSnackBar(
+          //   const SnackBar(content: Text('Business Header tapped')),
+          // );
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -148,7 +148,7 @@ class _BusinessHeaderState extends State<BusinessHeader> {
                     ),
                     SizedBox(height: screenHeight * 0.005),
                     Text(
-                      "Code: Ashu 9811",
+                      "Code: ${user?.refercode}",
                       style: GoogleFonts.poppins(
                         fontSize: screenWidth * 0.03,
                         color: Colors.grey.shade500,

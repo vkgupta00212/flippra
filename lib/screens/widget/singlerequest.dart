@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flippra/backend/category/getbusinesscards/updatebusinesscard.dart';
 import 'package:flippra/backend/getuser/getuser.dart';
@@ -64,31 +65,29 @@ class _SingleRequestState extends State<SingleRequest> {
   final insertquery = Get.put(InsertQuery());
   final getNearVendor = Get.put(GetNearVendor());
   final updatebusinesscard = Get.put(UpdateBusinessCard());
-  double minRange = 10.0;
+  double minRange = 0.0;
   double maxRange = 50.0;
   String currentRadius = "10";
   String currentWork = "Milkman";
   String currentType = "Cowmilk";
   String currentVendorType = "Wholeseller";
-  String? _rid;
-  String? Rid;
+  String? _rid = "20";
+  Timer? _debounceTimer;
   final _business = Get.put(GetBusinessCardController());
 
-  String getRid() {
-    if (_rid == null) {
-      final random = Random();
-      _rid = (10 + random.nextInt(90)).toString(); // generates 10-99
-      debugPrint("Generated new RID: $_rid");
-    }
-    return _rid!;
-  }
+  // String getRid() {
+  //   if (_rid == null) {
+  //     _rid = "20";
+  //     debugPrint("Generated new RID: $_rid");
+  //   }
+  //   return _rid!;
+  // }
 
-  void regenerateRid() {
-    final random = Random();
-    _rid = (10 + random.nextInt(90)).toString();
-    debugPrint("RID regenerated: $_rid");
-  }
-
+  // void regenerateRid() {
+  //   final random = Random();
+  //   _rid = (10 + random.nextInt(90)).toString();
+  //   debugPrint("RID regenerated: $_rid");
+  // }
 
   @override
   void initState() {
@@ -100,9 +99,12 @@ class _SingleRequestState extends State<SingleRequest> {
 
     // default filter at start
     _selectedFilter = "All";
-    // _businesscard = GetBusinessCard.getbusinesscard('4', _selectedFilter!);
+    _fetchBusinessCards(
+      subcategoryId: widget.id,
+      vendorType: _selectedFilter ?? "All",
+    );
 
-    minRange = 10.0;
+    minRange = 00.0;
     maxRange = 50.0;
   }
 
@@ -129,6 +131,32 @@ class _SingleRequestState extends State<SingleRequest> {
     if (mounted) {
       setState(() {});  // Rebuild to show new markers on map
       // Optional: Animate map to fit vendors (add later in Step 5)
+    }
+  }
+
+  Future<void> _fetchBusinessCards({required String subcategoryId, required String vendorType,}) async {
+    try {
+      // Optional: Show loading
+      _business.hasInitialData.value = false;
+      _business.cards.clear();
+
+      // Fetch from API via controller
+      await _business.getBusinessCardStream(
+        subcategoryId: subcategoryId,
+        vendorType: vendorType,
+      );
+
+      // Update UI
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Error fetching business cards: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load cards')),
+        );
+      }
     }
   }
 
@@ -216,23 +244,23 @@ class _SingleRequestState extends State<SingleRequest> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: _customLocationController,
-                      decoration: InputDecoration(
-                        hintText: 'Enter custom location',
-                        prefixIcon: const Icon(Icons.location_on_outlined),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Colors.grey.shade400,
-                          ),
-                        ),
-                      ),
-                    ),
+                    // TextField(
+                    //   controller: _customLocationController,
+                    //   decoration: InputDecoration(
+                    //     hintText: 'Enter custom location',
+                    //     prefixIcon: const Icon(Icons.location_on_outlined),
+                    //     contentPadding: const EdgeInsets.symmetric(
+                    //       horizontal: 12,
+                    //       vertical: 12,
+                    //     ),
+                    //     border: OutlineInputBorder(
+                    //       borderRadius: BorderRadius.circular(12),
+                    //       borderSide: BorderSide(
+                    //         color: Colors.grey.shade400,
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
                     const SizedBox(height: 10),
                     const Text(
                       'Select Range',
@@ -253,6 +281,12 @@ class _SingleRequestState extends State<SingleRequest> {
                       onChanged: (RangeValues values) {
                         setState(() {
                           _selectedRange = values;
+                        });
+
+                        _debounceTimer?.cancel();
+                        _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+                          currentRadius = values.start.round().toString();
+                          _fetchNearVendors(); // API is called with new radius
                         });
                       },
                     ),
@@ -279,7 +313,19 @@ class _SingleRequestState extends State<SingleRequest> {
                             'coords': null,
                           });
                         },
-                        child: const Text('Apply'),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context, {
+                              'city': null,
+                              'customLocation': _customLocationController.text.isNotEmpty
+                                  ? _customLocationController.text
+                                  : null,
+                              'range': _selectedRange,   // still return it (optional)
+                              'coords': null,
+                            });
+                          },
+                          child: const Text('Apply'),
+                        ),
                       ),
                     ),
                   ],
@@ -293,18 +339,16 @@ class _SingleRequestState extends State<SingleRequest> {
   }
 
   Future<String?> _showFilterSelector(BuildContext context) {
-    final filters = ['Retailer', 'Wholeseller', 'Reseller'];
-    String? selected;
+    final filters = ['All', 'Retailer', 'Wholeseller', 'Reseller'];
+    String? selected = _selectedFilter;
 
     return showDialog<String>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, dialogSetState) {
             return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               backgroundColor: Colors.white,
               child: Container(
                 width: MediaQuery.of(context).size.width * 0.9,
@@ -316,26 +360,15 @@ class _SingleRequestState extends State<SingleRequest> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Select Filter',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
+                        const Text('Select Filter',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                         IconButton(
-                          icon: const Icon(
-                            Icons.close,
-                            color: Colors.black54,
-                            size: 24,
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                        ),
+                            icon: const Icon(Icons.close, size: 24),
+                            onPressed: () => Navigator.pop(context)),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const Divider(height: 1, thickness: 1, color: Colors.grey),
+                    const Divider(height: 1),
                     const SizedBox(height: 8),
                     Flexible(
                       child: ListView.builder(
@@ -344,21 +377,25 @@ class _SingleRequestState extends State<SingleRequest> {
                         itemBuilder: (context, index) {
                           final f = filters[index];
                           final isSelected = selected == f;
+
                           return GestureDetector(
                             onTap: () {
-                              setState(() => selected = f);
-                              Navigator.pop(context, f);
+                              setState(() {
+                                _selectedFilter = f;
+                              });
+                              _fetchBusinessCards(
+                                subcategoryId: widget.id,
+                                vendorType: f,
+                              );
+                              currentVendorType = f;
+                              _fetchNearVendors();
+                              Navigator.pop(context);
                             },
                             child: Container(
                               margin: const EdgeInsets.symmetric(vertical: 4),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                               decoration: BoxDecoration(
-                                color: isSelected
-                                    ? Colors.blue.withOpacity(0.1)
-                                    : Colors.transparent,
+                                color: isSelected ? Colors.blue.withOpacity(0.1) : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -371,9 +408,7 @@ class _SingleRequestState extends State<SingleRequest> {
                                       shape: BoxShape.circle,
                                       color: isSelected ? Colors.blue : Colors.transparent,
                                       border: Border.all(
-                                        color: isSelected ? Colors.blue : Colors.grey.shade400,
-                                        width: 2,
-                                      ),
+                                          color: isSelected ? Colors.blue : Colors.grey.shade400, width: 2),
                                     ),
                                     child: isSelected
                                         ? const Icon(Icons.check, size: 16, color: Colors.white)
@@ -395,7 +430,6 @@ class _SingleRequestState extends State<SingleRequest> {
                         },
                       ),
                     ),
-                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -408,15 +442,11 @@ class _SingleRequestState extends State<SingleRequest> {
 
   Future<void> _handleRequest(BuildContext context, GetBusinessCardModel card) async {
     debugPrint("🚀 _handleRequest started");
-    _rid = getRid();
     debugPrint(_rid);
-    Rid = _rid;
     try {
 
       await _loadUser();
       debugPrint("🟢 _loadUser completed");
-      final rid = getRid();
-      print("Using RID: $rid");
 
       if (getusercontroller.users.isEmpty) {
         debugPrint('⚠️ No user data found, cannot send request');
@@ -439,7 +469,7 @@ class _SingleRequestState extends State<SingleRequest> {
         images: '',
         service: card.service,
         cardid: card.id.toString(),
-        rid: rid.toString()
+        rid: _rid.toString()
       );
       debugPrint("✅ Request completed with success flag: $success");
       await UpdateBusinessCard.updateBusinessCard(
@@ -462,7 +492,7 @@ class _SingleRequestState extends State<SingleRequest> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SingleRequestScreen(card: card,Rid: _rid.toString()),
+            builder: (context) => SingleRequestScreen(card: card),
           ),
         );
         debugPrint("🟢 Navigation to SingleRequestScreen done");
@@ -482,45 +512,75 @@ class _SingleRequestState extends State<SingleRequest> {
     }
   }
 
-  Future<void> _handleQuery(BuildContext context) async {
+  Future<void> _handleQuery(BuildContext context, GetBusinessCardModel card) async {
     try {
-      await _loadUser();
-
       if (getusercontroller.users.isEmpty) {
-        debugPrint('⚠️ No user data found, cannot send request');
+        debugPrint('Warning: No user data found');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⚠️ User not found. Please login again.')),
+          const SnackBar(content: Text('Warning: User not found. Please login again.')),
         );
         return;
       }
-      final user = getusercontroller.users.first;
 
+      final user = getusercontroller.users.first;
+      debugPrint("Fetched user → Name: ${user.firstName}, Phone: ${user.phoneNumber}");
+
+      // Current date-time
+      final now = DateTime.now();
+      final formattedDate =
+          "${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} "
+          "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+
+      // --------------------------------------------------------------
+      // 1. Full address line (city / custom) – same as you already had
+      // --------------------------------------------------------------
+      final cityOrCustom = _locationText1.trim().isNotEmpty
+          ? _locationText1.trim()
+          : "Unknown Location";
+
+      // --------------------------------------------------------------
+      // 2. Range (min km – max km) – exactly what you show under the city
+      // --------------------------------------------------------------
+      final rangeText = '$_locationText2 $_locationText3';   // e.g. "5 km 30 km"
+
+      // --------------------------------------------------------------
+      // 3. Combine them into ONE clean string (or send separately)
+      // --------------------------------------------------------------
+      final fullAddress = '$cityOrCustom, $rangeText';
+
+      debugPrint("Selected Location → $fullAddress");
+      debugPrint("Time → $formattedDate");
+
+      // --------------------------------------------------------------
+      // API CALL – send the combined address (or split fields if you prefer)
+      // --------------------------------------------------------------
       final success = await insertquery.insertquery(
         token: 'wvnwivnoweifnqinqfinefnq',
         Name: user.firstName,
         Phone: user.phoneNumber,
-        Problem: "Problems",
-        Datetimes: "01/02/2001",
-        Address: "Delhi",
+        Problem: card.productName,
+        Datetimes: formattedDate,
+        Address: fullAddress,          // <-- THIS NOW CONTAINS CITY + RANGE
       );
 
       if (!mounted) return;
 
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(requestService.message.value)),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ ${requestService.message.value}')),
-        );
-      }
+      final msg = insertquery.message.value.isNotEmpty
+          ? insertquery.message.value
+          : (success ? "Query sent successfully!" : "Query failed!");
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success ? "Success: $msg" : "Error: $msg"),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
     } catch (e) {
-      debugPrint('❌ Error in _handleRequest: $e');
+      debugPrint('Exception in _handleQuery: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Something went wrong. Please try again.')),
+        const SnackBar(content: Text('Warning: Something went wrong. Please try again.')),
       );
     }
   }
@@ -537,6 +597,7 @@ class _SingleRequestState extends State<SingleRequest> {
   @override
   void dispose() {
     _hideFloatingRequestCard();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -632,7 +693,13 @@ class _SingleRequestState extends State<SingleRequest> {
             Column(
               children: [
                 _buildMapSection(),
-                _buildBusinessCardList(),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    color: const Color(0xFF00B3A7),
+                    child: _buildBusinessCardList(), // ← NOW WORKS
+                  ),
+                ),
               ],
             ),
             _buildBackButton(),
@@ -740,7 +807,7 @@ class _SingleRequestState extends State<SingleRequest> {
                   final result = await _showCitySelector(context);
                   if (result != null) {
                     setState(() {
-                      _locationText1 = result['city'] ??
+                      _locationText1 = result ['city'] ??
                           result['customLocation'] ??
                           _locationText1;
 
@@ -800,29 +867,21 @@ class _SingleRequestState extends State<SingleRequest> {
               color: Colors.white.withOpacity(0.7),
             ),
             GestureDetector(
-              onTap: () async {
-                final result = await _showFilterSelector(context);
-                if (result != null) {
-                  setState(() {
-                    _selectedFilter = result; // ✅ save user’s choice
-                    // _businesscard = GetBusinessCard.getbusinesscard('4', _selectedFilter!);
-                  });
-                }
-              },
+              onTap: () => _showFilterSelector(context), // Just opens the dialog
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Text(
-                      'Filters',
-                      style: TextStyle(color: Colors.white, fontSize: 14),
+                      _selectedFilter ?? 'All',
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
                     ),
-                    SizedBox(width: 4),
-                    Icon(
+                    const SizedBox(width: 4),
+                    const Icon(
                       Icons.keyboard_arrow_down,
                       color: Colors.white,
                       size: 20,
@@ -1007,177 +1066,171 @@ class _SingleRequestState extends State<SingleRequest> {
   }
 
   Widget _buildBusinessCardList() {
-    return Expanded(
-      child: Obx(() {
-        final showShimmer = !_business.hasInitialData.value && _business.cards.isEmpty;
+    return StreamBuilder<List<GetBusinessCardModel>>(
+      stream: _business.getBusinessCardStream(
+        subcategoryId: widget.id,
+        vendorType: _selectedFilter ?? "",
+      ),
+      builder: (context, snapshot) {
+        // ⏳ Still waiting for data -> show progress
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !_business.hasInitialData.value) {
+          return emptyVendorProgress();
+        }
 
-        return StreamBuilder<List<GetBusinessCardModel>>(
-          stream: _business.getBusinessCardStream(
-            subcategoryId: widget.id,
-            vendorType: _selectedFilter ?? "All",
+        // 🌀 While refreshing / updating but no data yet
+        if (snapshot.hasData && snapshot.data!.isEmpty &&
+            !_business.hasInitialData.value) {
+          return emptyVendorProgress();
+        }
+
+        // ❌ After data fetched but empty list
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Container(
+            color: const Color(0xFF00B3A7),
+            height: MediaQuery.of(context).size.height * 0.8,
+            alignment: Alignment.center,
+            child: const Text(
+              'No vendor found',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+          );
+        }
+
+        // ✅ Show vendor cards
+        final businessCards = snapshot.data!;
+        return Container(
+          color: const Color(0xFF00B3A7),
+          padding: const EdgeInsets.only(bottom: 100),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: businessCards.length,
+            itemBuilder: (context, i) =>
+                _buildBusinessCard(context, businessCards[i]),
           ),
-          builder: (context, snapshot) {
-            // First load → shimmer
-            if (showShimmer) {
-              return emptyVendorProgress();
-            }
-
-            // Empty state
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(
-                child: Text(
-                  'No business cards available',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
-              );
-            }
-
-            // Real cards
-            return Container(
-              color: const Color(0xFF00B3A7),
-              padding: const EdgeInsets.only(bottom: 100),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: snapshot.data!.length,
-                itemBuilder: (context, i) => _buildBusinessCard(context, snapshot.data![i]),
-              ),
-            );
-          },
         );
-      }),
+      },
     );
   }
 
   Widget _buildBusinessCard(BuildContext context, GetBusinessCardModel card) {
+    final bool isRequested = card.request == "Yes";
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 14),
       child: Card(
-        elevation: 8,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        elevation: 6,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             gradient: const LinearGradient(
-              colors: [Colors.white, Color(0xFFF5FFFE)],
+              colors: [Colors.white, Color(0xFFF8FFFE)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Image + Info
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Image
-                        Hero(
-                          tag: 'card_${card.id}',
-                          child: Container(
-                            width: 88,
-                            height: 88,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: Colors.teal.shade100, width: 2.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
+                    // IMAGE
+                    Hero(
+                      tag: 'card_${card.id}',
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.teal.shade100, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
                             ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: Image.network(
-                                card.fullImageUrl.isNotEmpty
-                                    ? card.fullImageUrl
-                                    : 'https://via.placeholder.com/88',
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Image.asset(
-                                  'assets/icons/business_card_placeholder.png',
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.network(
+                            card.fullImageUrl.isNotEmpty
+                                ? card.fullImageUrl
+                                : 'https://via.placeholder.com/72',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/icons/business_card_placeholder.png',
+                              fit: BoxFit.cover,
                             ),
                           ),
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
 
-                        const SizedBox(width: 16),
-
-                        // Info
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    // PRODUCT NAME + PRICE + RATING + CART
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            card.productName,
+                            style: const TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
                             children: [
                               Text(
-                                card.productName,
+                                '₹${card.price}',
                                 style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.teal,
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Text(
-                                    '₹ ${card.price}',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.teal,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _buildRatingStars(double.tryParse(card.rating) ?? 0),
-                                ],
+                              const SizedBox(width: 6),
+                              _buildRatingStars(
+                                  double.tryParse(card.rating) ?? 0),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.shade50,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Icon(
+                                  Icons.add_shopping_cart,
+                                  size: 16,
+                                  color: Colors.teal,
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-
-                    const SizedBox(height: 20),
-
-                    // Action Buttons
-                    card.request != "Yes"
-                        ? DualSliderButton(
-                      onEnquiry: () => _handleQuery(context),
-                      onRequest: () => _handleRequest(context, card),
-                    )
-                        : _buildRequestSentRow(context, card),
                   ],
                 ),
-              ),
-
-              // Cart Badge
-              Positioned(
-                top: 14,
-                right: 14,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.shade600,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(Icons.add_shopping_cart, size: 18, color: Colors.white),
-                ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                if (!isRequested)
+                  DualSliderButton(
+                    onEnquiry: () => _handleQuery(context, card),
+                    onRequest: () => _handleRequest(context, card),
+                  )
+                else
+                  _buildRequestSentRow(context, card),
+              ],
+            ),
           ),
         ),
       ),
@@ -1187,44 +1240,39 @@ class _SingleRequestState extends State<SingleRequest> {
   Widget _buildRequestSentRow(BuildContext context, GetBusinessCardModel card) {
     return Row(
       children: [
-        // Request Sent
         Expanded(
-          flex: 3,
           child: GestureDetector(
             onTap: () {
-              if (!context.mounted) return;
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => SingleRequestScreen(card: card, Rid: Rid.toString()),
+                  builder: (_) => SingleRequestScreen(card: card),
                 ),
               );
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              height: 34,
               decoration: BoxDecoration(
                 color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.green.shade300),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade300, width: 1),
               ),
-              child: const Text(
-                "Request Sent",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.green,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
+              child: const Center(
+                child: Text(
+                  "Request Sent",
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
           ),
         ),
-
-        const SizedBox(width: 12),
-
-        // Cancel Button with Spinner
-        Expanded(
-          flex: 1,
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 34,
           child: CancelButton(card: card),
         ),
       ],
@@ -1233,10 +1281,11 @@ class _SingleRequestState extends State<SingleRequest> {
 
   Widget _buildRatingStars(double rating) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (i) {
         return Icon(
           i < rating ? Icons.star : Icons.star_border,
-          size: 16,
+          size: 14,
           color: Colors.orange.shade600,
         );
       }),
@@ -1359,6 +1408,10 @@ class _SingleRequestState extends State<SingleRequest> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: _childcategory.map((item) {
+                            final int currentIndex = _childcategory
+                                .indexWhere((e) => e.id == item.id) +
+                                1;
+
                             return Row(
                               children: [
                                 Semantics(
@@ -1366,15 +1419,8 @@ class _SingleRequestState extends State<SingleRequest> {
                                   child: _buildBottomNavIcon(
                                     iconPath: item.categoryImg,
                                     label: item.categoryName,
-                                    index: _childcategory
-                                        .indexWhere((element) => element.id == item.id) +
-                                        1,
-                                    onTap: () {
-                                      // setState(() {
-                                      //   _businesscard =
-                                      //       _business(item.id.toString(),"All" );
-                                      // });
-                                    },
+                                    index: currentIndex,
+                                    childId: item.id.toString(), // ADD THIS LINE
                                   ),
                                 ),
                                 SizedBox(width: screenWidth * 0.05),
@@ -1388,11 +1434,6 @@ class _SingleRequestState extends State<SingleRequest> {
                 ),
               ),
             ),
-            // Bottomnavbar(
-            //   onProfileTap: () => debugPrint('Profile tapped'),
-            //   onToggle: () => debugPrint('Toggle switched'),
-            //   onBoxTap: () => debugPrint('Box tapped'),
-            // ),
           ],
         ),
       ),
@@ -1404,7 +1445,7 @@ class _SingleRequestState extends State<SingleRequest> {
     required String iconPath,
     required String label,
     required int index,
-    required VoidCallback onTap,
+    required String childId, // ADD THIS: child category ID
   }) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth >= 600;
@@ -1413,14 +1454,26 @@ class _SingleRequestState extends State<SingleRequest> {
         : Colors.grey.shade300;
 
     final bool isNetworkImage = iconPath.startsWith('http');
+
     return Semantics(
       label: label,
       button: true,
       child: Padding(
-        padding: const EdgeInsets.only(left: 15,right: 15),
+        padding: const EdgeInsets.only(left: 15, right: 15),
         child: InkWell(
           key: key,
-          onTap: onTap,
+          onTap: () {
+            // UPDATE UI
+            setState(() {
+              _selectedIndex = index;
+            });
+
+            // FETCH NEW CARDS
+            _fetchBusinessCards(
+              subcategoryId: childId,
+              vendorType: _selectedFilter ?? "All",
+            );
+          },
           borderRadius: BorderRadius.circular(30),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1628,7 +1681,7 @@ class _DualSliderButtonState extends State<DualSliderButton>
     const circleSize = 30.0;
     final centerPosition = (width - circleSize) / 2;
     final minLimit = width * 0.02;
-    final maxLimit = width * 0.98 - circleSize;
+    final maxLimit = width * 0.97 - circleSize;
 
     final double effectivePosition = _isResetting
         ? _startPosition! + (_targetPosition! - _startPosition!) * _positionAnimation.value
@@ -1681,7 +1734,7 @@ class _DualSliderButtonState extends State<DualSliderButton>
                         child: Text(
                           'Enquiry | send',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.black,
                             fontSize: 11,
                             fontWeight: FontWeight.w100,
                             letterSpacing: 0.3,
@@ -1699,7 +1752,7 @@ class _DualSliderButtonState extends State<DualSliderButton>
                         child: Text(
                           'Request | send',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.black,
                             fontSize: 11,
                             fontWeight: FontWeight.w100,
                             decoration: TextDecoration.underline,
@@ -1726,7 +1779,7 @@ class _DualSliderButtonState extends State<DualSliderButton>
                       ),
                     ),
                   ),
-                ),
+                  ),
               Positioned(
                 left: effectivePosition,
                 child: GestureDetector(

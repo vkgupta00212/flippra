@@ -19,8 +19,8 @@ import 'package:shimmer/shimmer.dart';
 
 class SingleRequestScreen extends StatefulWidget {
   final GetBusinessCardModel card;
-  final String Rid;
-  const SingleRequestScreen({Key? key, required this.card,required this.Rid}) : super(key: key);
+  // final String Rid;
+  const SingleRequestScreen({Key? key, required this.card}) : super(key: key);
 
   @override
   State<SingleRequestScreen> createState() => _SingleRequestScreenState();
@@ -43,13 +43,14 @@ class _SingleRequestScreenState extends State<SingleRequestScreen> {
   OverlayEntry? _floatingEntry;
   final Set<int> _cartItems = {};
   final showacceptvendor = Get.put(GetAcceptVendorsController());
+  final String Rid = "20";
 
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
-    showacceptvendor.fetchAcceptedVendors(widget.Rid);
-    showacceptvendor.startAutoRefresh(requestId: widget.Rid,intervalSeconds:1);
+    showacceptvendor.fetchAcceptedVendors(Rid);
+    showacceptvendor.startAutoRefresh(requestId: Rid,intervalSeconds:1);
   }
 
 

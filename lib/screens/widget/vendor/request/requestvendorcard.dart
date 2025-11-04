@@ -1,8 +1,10 @@
 import 'package:animate_do/animate_do.dart';
+import 'package:flippra/screens/widget/chatscreen3.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../backend/servicerequest/showservicerequest.dart';
+import '../../chatscreen2.dart';
 
 class RequestVendorCard1 extends StatefulWidget{
   final ShowServiceRequestModel request;
@@ -17,7 +19,12 @@ class _RequestVendorCard1State extends State<RequestVendorCard1> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ChatScreen3(request: widget.request,)),
+        );
+      },
       child: Column(
         children: [
           Padding(
@@ -178,14 +185,6 @@ class _RequestVendorCard1State extends State<RequestVendorCard1> {
                 ],
               ),
             ),
-          ),
-          DualSliderButton(
-            onEnquiry: () {
-              print("Reject leds ✅");
-            },
-            onRequest: () {
-              print("Accept leds ✅");
-            },
           ),
         ],
       ),
@@ -370,320 +369,6 @@ class _RequestVendorCard1State extends State<RequestVendorCard1> {
 //   );
 // }
 
-class DualSliderButton extends StatefulWidget {
-  final VoidCallback onEnquiry;
-  final VoidCallback onRequest;
-
-  const DualSliderButton({
-    Key? key,
-    required this.onEnquiry,
-    required this.onRequest,
-  }) : super(key: key);
-
-  @override
-  _DualSliderButtonState createState() => _DualSliderButtonState();
-}
-
-class _DualSliderButtonState extends State<DualSliderButton> with SingleTickerProviderStateMixin {
-  double _position = 0;
-  late AnimationController _controller;
-  late Animation<Color?> _colorAnimation;
-  late Animation<double> _iconAnimation;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _textFadeAnimation;
-  late Animation<double> _labelOpacityAnimationLeft;
-  late Animation<double> _labelOpacityAnimationRight;
-  late Animation<double> _positionAnimation;
-  bool _isDoneIcon = false;
-  String? _successMessage;
-  bool _isResetting = false;
-  double? _startPosition;
-  double? _targetPosition;
-
-  @override
-  void initState() {
-    super.initState();
-    // Initialize position to center
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final width = MediaQuery.of(context).size.width * 0.8;
-      const circleSize = 36.0;
-      setState(() {
-        _position = (width - circleSize) / 2;
-      });
-    });
-
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-    _colorAnimation = ColorTween(
-      begin: Colors.grey[350],
-      end: const Color(0xFF00B3A7),
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutSine,
-    ));
-    _iconAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutBack,
-    ));
-    _textFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutCubic,
-    ));
-    _labelOpacityAnimationLeft = Tween<double>(begin: 0.5, end: 1.0).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutSine,
-    ));
-    _labelOpacityAnimationRight = Tween<double>(begin: 0.5, end: 1.0).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutSine,
-    ));
-    _positionAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.bounceOut, // Replaced Curves.spring with Curves.bounceOut
-    ));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width * 0.8;
-    final height = 40.0;
-    const circleSize = 35.0;
-    final centerPosition = (width - circleSize) / 2;
-    final minLimit = width * 0.02;
-    final maxLimit = width * 0.98 - circleSize;
-
-    double effectivePosition;
-    if (_isResetting) {
-      effectivePosition = _startPosition! + (_targetPosition! - _startPosition!) * _positionAnimation.value;
-    } else {
-      effectivePosition = _position;
-    }
-
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Container(
-          width: width,
-          height: height,
-          margin: const EdgeInsets.all(8.0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(50),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                spreadRadius: 2,
-                offset: const Offset(0, 4),
-              ),
-              BoxShadow(
-                color: const Color(0xFF00B3A7).withOpacity(0.2),
-                spreadRadius: 1,
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-            gradient: LinearGradient(
-              colors: [
-                _colorAnimation.value!.withOpacity(0.85),
-                _colorAnimation.value!,
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Opacity(
-                opacity: 1 - _textFadeAnimation.value,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 28),
-                      child: AnimatedOpacity(
-                        opacity: _position < centerPosition ? _labelOpacityAnimationLeft.value : 0.5,
-                        duration: const Duration(milliseconds: 300),
-                        child: Text(
-                          "Reject | leds",
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w100,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 28),
-                      child: AnimatedOpacity(
-                        opacity: _position > centerPosition ? _labelOpacityAnimationRight.value : 0.5,
-                        duration: const Duration(milliseconds: 300),
-                        child: Text(
-                          "Accept leds",
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w100,
-                            decoration: TextDecoration.underline,
-                            decorationColor: Colors.white.withOpacity(0.7),
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (_successMessage != null)
-                FadeTransition(
-                  opacity: _textFadeAnimation,
-                  child: Center(
-                    child: Text(
-                      _successMessage!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w200,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                  ),
-                ),
-              Positioned(
-                left: effectivePosition,
-                child: GestureDetector(
-                  onHorizontalDragStart: (details) {
-                    HapticFeedback.lightImpact();
-                  },
-                  onHorizontalDragUpdate: (details) {
-                    setState(() {
-                      _position += details.delta.dx;
-                      _position = _position.clamp(minLimit, maxLimit);
-                      final progress = ((_position - minLimit) / (maxLimit - minLimit) - 0.5).abs() * 2;
-                      _controller.value = progress.clamp(0.0, 1.0);
-                    });
-                  },
-                  onHorizontalDragEnd: (details) async {
-                    _targetPosition = centerPosition;
-                    if (_position <= minLimit + 12) {
-                      // Slide left → Enquiry
-                      HapticFeedback.mediumImpact();
-                      setState(() {
-                        _position = minLimit;
-                        _isDoneIcon = true;
-                        _successMessage = " Reject leds";
-                      });
-                      await _controller.forward();
-                      await Future.delayed(const Duration(milliseconds: 1000));
-                      widget.onEnquiry();
-                      setState(() {
-                        _isDoneIcon = false;
-                        _startPosition = _position;
-                        _isResetting = true;
-                      });
-                      await _controller.reverse();
-                      setState(() {
-                        _isResetting = false;
-                        _successMessage = null;
-                        _position = centerPosition;
-                      });
-                    } else if (_position >= maxLimit - 12) {
-                      // Slide right → Request
-                      HapticFeedback.mediumImpact();
-                      setState(() {
-                        _position = maxLimit;
-                        _isDoneIcon = true;
-                        _successMessage = "Accept leds";
-                      });
-                      await _controller.forward();
-                      await Future.delayed(const Duration(milliseconds: 1000));
-                      widget.onRequest();
-                      setState(() {
-                        _isDoneIcon = false;
-                        _startPosition = _position;
-                        _isResetting = true;
-                      });
-                      await _controller.reverse();
-                      setState(() {
-                        _isResetting = false;
-                        _successMessage = null;
-                        _position = centerPosition;
-                      });
-                    } else {
-                      HapticFeedback.lightImpact();
-                      setState(() {
-                        _startPosition = _position;
-                        _isResetting = true;
-                      });
-                      await _controller.reverse();
-                      setState(() {
-                        _isResetting = false;
-                        _position = centerPosition;
-                      });
-                    }
-                  },
-                  child: Transform.scale(
-                    scale: _scaleAnimation.value,
-                    child: Container(
-                      height: circleSize,
-                      width: circleSize,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            spreadRadius: 1.2,
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                          BoxShadow(
-                            color: const Color(0xFF00B3A7).withOpacity(0.3),
-                            spreadRadius: 0.5,
-                            blurRadius: 3,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 400),
-                        transitionBuilder: (Widget child, Animation<double> animation) {
-                          return ScaleTransition(
-                            scale: animation,
-                            child: FadeTransition(opacity: animation, child: child),
-                          );
-                        },
-                        child: Icon(
-                          _isDoneIcon ? Icons.done : Icons.arrow_forward_ios,
-                          key: ValueKey<bool>(_isDoneIcon),
-                          size: 15,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
 
 Widget VendorFooter() {
   return Container(

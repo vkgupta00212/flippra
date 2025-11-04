@@ -10,6 +10,7 @@ class GetUserModel {
   final String email;
   final String city;
   final String phoneNumber;
+  final String refercode;
 
   GetUserModel({
     required this.id,
@@ -19,6 +20,7 @@ class GetUserModel {
     required this.email,
     required this.city,
     required this.phoneNumber,
+    required this.refercode,
   });
 
   factory GetUserModel.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,8 @@ class GetUserModel {
       email: json['Email'] ?? '',
       city: json['City'] ?? '',
       phoneNumber: json['phonenumber'] ?? '',
+      // ✅ Corrected key — matches backend: "Refercode"
+      refercode: json['Refercode'] ?? '',
     );
   }
 }
@@ -44,6 +48,7 @@ class GetUser extends GetxController {
   }) async {
     final url = Uri.parse(
         "https://flippraa.anklegaming.live/APIs/APIs.asmx/ShowRegisterUsers");
+
     try {
       isLoading.value = true;
       final response = await http.post(
@@ -58,11 +63,14 @@ class GetUser extends GetxController {
       if (response.statusCode == 200) {
         final bodyString = response.body;
         final match = RegExp(r'\[.*\]').firstMatch(bodyString);
+
         if (match != null) {
           final jsonString = match.group(0)!;
           final List<dynamic> data = jsonDecode(jsonString);
-          users.value =
-              data.map((e) => GetUserModel.fromJson(e)).toList();
+
+          print("✅ Parsed user data: $data"); // optional debug
+
+          users.value = data.map((e) => GetUserModel.fromJson(e)).toList();
         } else {
           users.clear();
         }
@@ -70,6 +78,7 @@ class GetUser extends GetxController {
         users.clear();
       }
     } catch (e) {
+      print("❌ Error fetching user details: $e");
       users.clear();
     } finally {
       isLoading.value = false;

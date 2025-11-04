@@ -1,5 +1,6 @@
 import 'package:flippra/backend/getuser/getuser.dart';
 import 'package:flippra/backend/register/register.dart';
+import 'package:flippra/screens/homescreens/home/homemain.dart';
 import 'package:flutter/material.dart';
 import 'package:flippra/screens/gender_confirm_screen.dart';
 import 'package:get/get.dart';
@@ -123,14 +124,13 @@ class _EnterOtpScreenState extends State<EnterOtpScreen> {
             user.gender.isNotEmpty && user.firstName.isNotEmpty;
 
         if (hasCompleteInfo) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HomeScreenCategoryScreen()),
+          Navigator.push(context,
+            MaterialPageRoute(builder: (context)=> HomeMain())
           );
         } else {
-          Navigator.pushReplacement(
+          Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const GenderConfirmScreen()),
+            MaterialPageRoute(builder: (context)=> const GenderConfirmScreen()),
           );
         }
       } else {

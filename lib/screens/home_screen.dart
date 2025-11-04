@@ -1,3 +1,4 @@
+import 'package:flippra/screens/homescreens/home/homemain.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:get/get.dart';
@@ -227,7 +228,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const HomeScreenCategoryScreen()),
+                    builder: (context) => HomeMain()
+                  ),
                 );
               },
               style: ElevatedButton.styleFrom(
